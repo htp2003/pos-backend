@@ -180,10 +180,9 @@ exports.checkVietQRPayment = async (req, res) => {
 
 exports.confirmPayment = async (req, res) => {
     try {
-        const { orderId } = req.body;
-        console.log("Received confirmPayment request for orderId:", orderId);
+        const { orderId, paymentMethod, cashReceived, change } = req.body;
+        console.log("Received confirmPayment request:", { orderId, paymentMethod, cashReceived, change });
 
-        // Validate orderId
         if (!orderId) {
             console.log("OrderId is missing");
             return res.status(400).json({ message: "OrderId is required" });
@@ -207,8 +206,18 @@ exports.confirmPayment = async (req, res) => {
             });
         }
 
-        // Cập nhật trạng thái
+        // Cập nhật thông tin thanh toán
         order.status = "paid";
+        order.paymentMethod = paymentMethod || "qr";
+
+        // Thêm thông tin thanh toán tiền mặt nếu có
+        if (paymentMethod === "cash") {
+            order.cashPayment = {
+                received: cashReceived,
+                change: change
+            };
+        }
+
         await order.save();
         console.log("Order status updated to paid");
 
@@ -225,6 +234,7 @@ exports.confirmPayment = async (req, res) => {
         });
     }
 };
+
 exports.getOrderById = async (req, res) => {
     try {
         const order = await Order.findById(req.params.id).populate("products.productId");

@@ -10,6 +10,16 @@ const orderSchema = new mongoose.Schema({
     totalPrice: { type: Number, required: true },
     status: { type: String, enum: ["pending", "paid", "cancelled"], default: "pending" },
     createdAt: { type: Date, default: Date.now },
+    // Thêm các trường mới
+    paymentMethod: {
+        type: String,
+        enum: ["cash", "qr"],
+        default: "qr"
+    },
+    cashPayment: {
+        received: { type: Number },
+        change: { type: Number }
+    }
 });
 
 const Order = mongoose.model("Order", orderSchema);
