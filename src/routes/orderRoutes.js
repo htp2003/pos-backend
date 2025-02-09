@@ -12,5 +12,7 @@ router.get("/:id/invoice", orderController.generateInvoice);
 router.post("/payment/qr", orderController.createVietQR);
 router.post("/payment/check", orderController.checkVietQRPayment);
 router.patch("/payment/confirm", orderController.confirmPayment);
+//dashboard route:
+router.get("/stats/dashboard", orderController.getDashboardStats);
 
 module.exports = router;

@@ -328,3 +328,89 @@ exports.generateInvoice = async (req, res) => {
         });
     }
 };
+
+// Get dashboard stats
+exports.getDashboardStats = async (req, res) => {
+    try {
+        const { range } = req.query; // 'week' hoặc 'month'
+        const daysToLookback = range === 'month' ? 30 : 7;
+
+        // Lấy ngày bắt đầu thống kê
+        const startDate = new Date();
+        startDate.setDate(startDate.getDate() - daysToLookback);
+        startDate.setHours(0, 0, 0, 0);
+
+        // Lấy tất cả đơn hàng từ startDate đến hiện tại
+        const orders = await Order.find({
+            createdAt: { $gte: startDate },
+            status: "paid"
+        }).populate("products.productId");
+
+        // Tính tổng doanh thu và số đơn hàng
+        const totalRevenue = orders.reduce((sum, order) => sum + order.totalPrice, 0);
+        const totalOrders = orders.length;
+        const averageOrderValue = totalOrders > 0 ? totalRevenue / totalOrders : 0;
+
+        // Tính doanh thu theo ngày
+        const dailySales = [];
+        for (let i = 0; i < daysToLookback; i++) {
+            const date = new Date();
+            date.setDate(date.getDate() - i);
+            date.setHours(0, 0, 0, 0);
+
+            const nextDate = new Date(date);
+            nextDate.setDate(date.getDate() + 1);
+
+            const dayOrders = orders.filter(order =>
+                order.createdAt >= date && order.createdAt < nextDate
+            );
+
+            const total = dayOrders.reduce((sum, order) => sum + order.totalPrice, 0);
+
+            dailySales.unshift({
+                date: date.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit' }),
+                total
+            });
+        }
+
+        // Tính top sản phẩm bán chạy
+        const productStats = new Map();
+
+        orders.forEach(order => {
+            order.products.forEach(item => {
+                const product = item.productId;
+                if (!productStats.has(product._id)) {
+                    productStats.set(product._id, {
+                        _id: product._id,
+                        name: product.name,
+                        totalQuantity: 0,
+                        totalRevenue: 0
+                    });
+                }
+
+                const stats = productStats.get(product._id);
+                stats.totalQuantity += item.quantity;
+                stats.totalRevenue += product.price * item.quantity;
+            });
+        });
+
+        const topProducts = Array.from(productStats.values())
+            .sort((a, b) => b.totalRevenue - a.totalRevenue)
+            .slice(0, 5);
+
+        res.json({
+            totalRevenue,
+            totalOrders,
+            averageOrderValue,
+            dailySales,
+            topProducts
+        });
+
+    } catch (err) {
+        console.error("Error getting dashboard stats:", err);
+        res.status(500).json({
+            message: "Error getting dashboard stats",
+            error: err.message
+        });
+    }
+};
