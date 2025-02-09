@@ -7,6 +7,7 @@ router.post("/", orderController.createOrder);
 router.put("/:id", orderController.updateOrderStatus);
 router.delete("/:id", orderController.deleteOrder);
 router.get("/:id", orderController.getOrderById);
+router.get("/:id/invoice", orderController.generateInvoice);
 //payemnt route:
 router.post("/payment/qr", orderController.createVietQR);
 router.post("/payment/check", orderController.checkVietQRPayment);

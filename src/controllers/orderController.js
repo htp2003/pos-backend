@@ -1,6 +1,9 @@
 const Order = require("../models/Order");
 const Product = require("../models/Product");
 const axios = require("axios");
+const PDFDocument = require('pdfkit');
+const fs = require('fs');
+const path = require('path');
 // Get all orders
 exports.getOrders = async (req, res) => {
     try {
@@ -231,5 +234,97 @@ exports.getOrderById = async (req, res) => {
         res.json(order);
     } catch (err) {
         res.status(500).json({ message: err.message });
+    }
+};
+
+exports.generateInvoice = async (req, res) => {
+    try {
+        const orderId = req.params.id;
+        console.log("Generating invoice for order:", orderId);
+
+        const order = await Order.findById(orderId).populate('products.productId');
+        if (!order) {
+            console.log("Order not found:", orderId);
+            return res.status(404).json({ message: "Order not found" });
+        }
+
+        // Tạo PDF document với font Unicode
+        const doc = new PDFDocument({
+            font: path.join(__dirname, '../fonts/NotoSans-Regular.ttf'),
+            size: 'A4',
+            margin: 50
+        });
+
+        // Đăng ký font Unicode
+        doc.registerFont('NotoSans', path.join(__dirname, '../fonts/NotoSans-Regular.ttf'));
+        doc.registerFont('NotoSans-Bold', path.join(__dirname, '../fonts/NotoSans-Bold.ttf'));
+
+        const filename = `invoice-${orderId}.pdf`;
+        doc.pipe(res);
+
+        // Header với font Unicode
+        doc.font('NotoSans-Bold').fontSize(20).text('HÓA ĐƠN BÁN HÀNG', { align: 'center' });
+        doc.moveDown();
+
+        // Thông tin đơn hàng
+        doc.font('NotoSans').fontSize(12)
+            .text(`Mã đơn hàng: ${orderId}`)
+            .text(`Ngày: ${new Date().toLocaleString('vi-VN')}`);
+        doc.moveDown();
+
+        // Table header
+        doc.font('NotoSans-Bold')
+            .text('STT    Tên sản phẩm                  Số lượng    Đơn giá         Thành tiền', {
+                underline: true
+            });
+        doc.moveDown();
+
+        // Products
+        doc.font('NotoSans');
+        let y = doc.y;
+        order.products.forEach((item, index) => {
+            const product = item.productId;
+            const total = product.price * item.quantity;
+
+            // Định dạng text để tránh lỗi encoding
+            const formattedText = `${index + 1}      ${product.name.padEnd(30)}` +
+                `${item.quantity.toString().padStart(5)}     ` +
+                `${product.price.toLocaleString('vi-VN').padStart(10)}    ` +
+                `${total.toLocaleString('vi-VN').padStart(15)}`;
+
+            doc.text(formattedText, { continued: false });
+            y = doc.y;
+        });
+
+        // Total
+        doc.moveDown()
+            .text('-'.repeat(95));
+
+        doc.font('NotoSans-Bold')
+            .fontSize(14)
+            .text(`Tổng tiền: ${order.totalPrice.toLocaleString('vi-VN')} VND`, {
+                align: 'right'
+            });
+
+        // Footer
+        doc.moveDown(2)
+            .font('NotoSans')
+            .fontSize(10)
+            .text('Cảm ơn quý khách đã mua hàng!', {
+                align: 'center'
+            });
+
+        // Set response headers
+        res.setHeader('Content-Type', 'application/pdf');
+        res.setHeader('Content-Disposition', `attachment; filename=${filename}`);
+
+        doc.end();
+
+    } catch (err) {
+        console.error("Error generating invoice:", err);
+        res.status(500).json({
+            message: "Error generating invoice",
+            error: err.message
+        });
     }
 };
