@@ -10,8 +10,10 @@ router.get("/:id", orderController.getOrderById);
 router.get("/:id/invoice", orderController.generateInvoice);
 //payemnt route:
 router.post("/payment/qr", orderController.createVietQR);
-router.post("/payment/check", orderController.checkVietQRPayment);
+// router.post("/payment/check", orderController.checkVietQRPayment);
 router.patch("/payment/confirm", orderController.confirmPayment);
+router.post("/payment/check-casso", orderController.checkCassoPayment);
+
 //dashboard route:
 router.get("/stats/dashboard", orderController.getDashboardStats);
 

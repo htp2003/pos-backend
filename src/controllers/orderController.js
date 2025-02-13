@@ -109,74 +109,7 @@ exports.createVietQR = async (req, res) => {
     }
 };
 
-// Trong orderController.js, cập nhật lại phương thức checkVietQRPayment:
-exports.checkVietQRPayment = async (req, res) => {
-    try {
-        const { orderId } = req.body;
 
-        // Validate orderId
-        if (!orderId) {
-            return res.status(400).json({ message: "OrderId is required" });
-        }
-
-        const order = await Order.findById(orderId);
-        if (!order) {
-            return res.status(404).json({ message: "Order not found" });
-        }
-
-        // Nếu đơn hàng đã thanh toán rồi, trả về luôn
-        if (order.status === "paid") {
-            return res.json({ orderId, status: "paid" });
-        }
-
-        const googleSheetApiUrl = "https://script.google.com/macros/s/AKfycbw-dQLrcfN9h31svIfqFrr8GWizbWUbhlNjf59hyu4o/dev";
-
-        try {
-            // Gọi API để lấy danh sách giao dịch từ Google Sheets
-            const response = await axios.get(googleSheetApiUrl);
-
-            if (!response.data || !response.data.data) {
-                console.error("Invalid response from Google Sheets:", response.data);
-                return res.status(500).json({ message: "Invalid transaction data format" });
-            }
-
-            const transactions = response.data.data;
-            const totalAmount = order.totalPrice;
-            const orderIdentifier = `ORDER-${orderId}`;
-
-            // Tìm giao dịch hợp lệ
-            const matchedTransaction = transactions.find(tx =>
-                tx["Mô tả"] &&
-                tx["Mô tả"].includes(orderIdentifier) &&
-                parseFloat(tx["Giá trị"]) === totalAmount
-            );
-
-            if (matchedTransaction) {
-                order.status = "paid";
-                await order.save();
-                return res.json({
-                    orderId,
-                    status: "paid",
-                    transactionId: matchedTransaction["Mã GD"]
-                });
-            }
-
-            res.json({ orderId, status: "pending" });
-        } catch (error) {
-            console.error("Error checking Google Sheets:", error);
-            res.status(500).json({
-                message: "Error checking payment status",
-                error: error.message
-            });
-        }
-    } catch (err) {
-        console.error("Server error:", err);
-        res.status(500).json({
-            message: "Internal server error",
-            error: err.message
-        });
-    }
-};
 
 exports.confirmPayment = async (req, res) => {
     try {
@@ -422,5 +355,62 @@ exports.getDashboardStats = async (req, res) => {
             message: "Error getting dashboard stats",
             error: err.message
         });
+    }
+};
+
+exports.checkCassoPayment = async (req, res) => {
+    try {
+        const { orderId } = req.body;
+        if (!orderId) {
+            return res.status(400).json({ message: "OrderId is required" });
+        }
+
+        const order = await Order.findById(orderId);
+        if (!order) {
+            return res.status(404).json({ message: "Order not found" });
+        }
+
+        const cassoApiUrl = "https://oauth.casso.vn/v2/transactions?pageSize=100";
+        const apiKey = process.env.CASSO_API_KEY;
+
+        const response = await axios.get(cassoApiUrl, {
+            headers: { Authorization: `Apikey ${apiKey}` }
+        });
+
+        console.log("🔍 Casso Response:", response.data);
+
+        if (!response.data || response.data.error !== 0) {
+            return res.status(500).json({ message: "Failed to fetch transaction data" });
+        }
+
+        const transactions = response.data.data.records;
+        const totalAmount = order.totalPrice;
+        const orderIdentifier = `ORDER${orderId.replace(/\s/g, "")}`; // Loại bỏ khoảng trắng
+
+        console.log(`🧐 Đang tìm: "${orderIdentifier}" với số tiền: ${totalAmount}`);
+
+        transactions.forEach(tx => {
+            console.log(`📌 Giao dịch: "${tx.description}" | Số tiền: ${tx.amount}`);
+        });
+
+        const matchedTransaction = transactions.find(tx =>
+            tx.description.replace(/\s/g, "").includes(orderIdentifier) &&
+            Number(tx.amount) === Number(totalAmount)  // Đảm bảo kiểu số chính xác
+        );
+
+        if (matchedTransaction) {
+            order.status = "paid";
+            await order.save();
+            return res.json({
+                orderId,
+                status: "paid",
+                transactionId: matchedTransaction.tid
+            });
+        }
+
+        res.json({ orderId, status: "pending" });
+    } catch (err) {
+        console.error("❌ Error in checkCassoPayment:", err);
+        res.status(500).json({ message: "Error checking payment", error: err.message });
     }
 };
