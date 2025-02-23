@@ -27,6 +27,7 @@ exports.register = async (req, res) => {
 exports.login = async (req, res) => {
     try {
         const { email, password, location } = req.body;
+        console.log("📍 Received location data:", location);
 
         // Kiểm tra user có tồn tại không
         const user = await User.findOne({ email });
@@ -37,7 +38,8 @@ exports.login = async (req, res) => {
         if (!isMatch) return res.status(400).json({ message: "Mật khẩu sai" });
 
         // Format location string
-        const locationStr = location?.latitude && location?.longitude
+
+        const locationStr = location && location.latitude && location.longitude
             ? `${location.latitude.toFixed(6)}, ${location.longitude.toFixed(6)}`
             : 'Không có vị trí';
 
@@ -59,6 +61,16 @@ exports.login = async (req, res) => {
     }
 };
 
+exports.logout = async (req, res) => {
+    try {
+        // Có thể thêm logic để invalidate token nếu cần
+        res.json({ message: "Đăng xuất thành công" });
+    } catch (error) {
+        console.error("❌ Lỗi đăng xuất:", error);
+        res.status(500).json({ message: "Lỗi server" });
+    }
+};
+
 exports.getLoginHistory = async (req, res) => {
     try {
         const users = await User.find({}, "name email loginHistory");
@@ -68,4 +80,5 @@ exports.getLoginHistory = async (req, res) => {
         res.status(500).json({ message: "Lỗi server" });
     }
 };
+
 
