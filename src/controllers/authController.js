@@ -36,8 +36,17 @@ exports.login = async (req, res) => {
         const isMatch = await bcrypt.compare(password, user.password);
         if (!isMatch) return res.status(400).json({ message: "Mật khẩu sai" });
 
+        // Format location string
+        const locationStr = location?.latitude && location?.longitude
+            ? `${location.latitude.toFixed(6)}, ${location.longitude.toFixed(6)}`
+            : 'Không có vị trí';
+
         // Cập nhật lịch sử đăng nhập + vị trí
-        user.loginHistory.push({ location });
+        user.loginHistory.push({
+            timestamp: new Date(),
+            locationStr: locationStr,
+            location: location // Giữ lại object location gốc nếu cần dùng sau này
+        });
         await user.save();
 
         // Tạo JWT token

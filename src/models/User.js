@@ -1,5 +1,3 @@
-const mongoose = require("mongoose");
-
 const userSchema = new mongoose.Schema({
     name: { type: String, required: true },
     email: { type: String, required: true, unique: true },
@@ -8,6 +6,7 @@ const userSchema = new mongoose.Schema({
     loginHistory: [
         {
             timestamp: { type: Date, default: Date.now },
+            locationStr: { type: String, default: 'Không có vị trí' },
             location: {
                 latitude: Number,
                 longitude: Number
@@ -15,6 +14,3 @@ const userSchema = new mongoose.Schema({
         }
     ]
 });
-
-const User = mongoose.model("User", userSchema);
-module.exports = User;
